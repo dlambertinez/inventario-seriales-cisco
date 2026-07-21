@@ -1,0 +1,169 @@
+name: Generar EXE Windows 64 bits
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths:
+      - "obtener_seriales_cisco.py"
+      - "requirements.txt"
+      - "ips.txt"
+      - ".github/workflows/generar-exe.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  generar-exe:
+    name: Compilar ejecutable Windows x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v7
+
+      - name: Configurar Python de 64 bits
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+          cache: "pip"
+
+      - name: Mostrar entorno
+        shell: powershell
+        run: |
+          python --version
+          python -c "import platform; print('Arquitectura:', platform.architecture())"
+          python -c "import sys; print('Python:', sys.executable)"
+
+      - name: Actualizar pip
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Instalar dependencias
+        shell: powershell
+        run: |
+          python -m pip install -r requirements.txt
+
+      - name: Verificar archivos requeridos
+        shell: powershell
+        run: |
+          if (-not (Test-Path "obtener_seriales_cisco.py")) {
+            throw "No existe obtener_seriales_cisco.py"
+          }
+
+          if (-not (Test-Path "requirements.txt")) {
+            throw "No existe requirements.txt"
+          }
+
+          if (-not (Test-Path "ips.txt")) {
+            throw "No existe ips.txt"
+          }
+
+          Write-Host "Archivos requeridos encontrados."
+          Get-ChildItem
+
+      - name: Detectar contenido HTML incorrecto
+        shell: powershell
+        run: |
+          $contenido = Get-Content "obtener_seriales_cisco.py" -Raw
+
+          $htmlMayor = [char]38 + "gt;"
+          $htmlMenor = [char]38 + "lt;"
+          $htmlAmp = [char]38 + "amp;"
+          $codigoDanado = "hoja" + "celda"
+
+          if ($contenido.Contains($htmlMayor)) {
+            throw "El codigo contiene una entidad HTML para el simbolo mayor que."
+          }
+
+          if ($contenido.Contains($htmlMenor)) {
+            throw "El codigo contiene una entidad HTML para el simbolo menor que."
+          }
+
+          if ($contenido.Contains($htmlAmp)) {
+            throw "El codigo contiene una entidad HTML para el simbolo ampersand."
+          }
+
+          if ($contenido.Contains($codigoDanado)) {
+            throw "El codigo contiene el texto incorrecto hojacelda."
+          }
+
+          Write-Host "No se encontraron entidades HTML ni codigo danado."
+
+      - name: Validar sintaxis de Python
+        shell: powershell
+        run: |
+          python -m py_compile obtener_seriales_cisco.py
+          Write-Host "Sintaxis de Python valida."
+
+      - name: Validar importaciones
+        shell: powershell
+        run: |
+          python -c "import netmiko; print('Netmiko:', netmiko.__version__)"
+          python -c "import openpyxl; print('OpenPyXL:', openpyxl.__version__)"
+          python -c "import paramiko; print('Paramiko:', paramiko.__version__)"
+          python -c "import textfsm; print('TextFSM correcto')"
+          python -c "import ntc_templates; print('NTC Templates correcto')"
+          python -c "import PyInstaller; print('PyInstaller:', PyInstaller.__version__)"
+
+      - name: Generar ejecutable
+        shell: powershell
+        run: |
+          python -m PyInstaller --noconfirm --clean --onefile --console --name InventarioSerialesCisco --collect-all netmiko --collect-all paramiko --collect-all textfsm --collect-all ntc_templates --collect-all openpyxl obtener_seriales_cisco.py
+
+      - name: Verificar ejecutable
+        shell: powershell
+        run: |
+          $rutaExe = "dist\InventarioSerialesCisco.exe"
+
+          if (-not (Test-Path $rutaExe)) {
+            throw "PyInstaller no genero el ejecutable esperado."
+          }
+
+          $archivo = Get-Item $rutaExe
+
+          Write-Host "Ejecutable generado correctamente."
+          Write-Host "Nombre: $($archivo.Name)"
+          Write-Host "Tamano: $($archivo.Length) bytes"
+          Write-Host "Ruta: $($archivo.FullName)"
+
+      - name: Preparar paquete
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "paquete" | Out-Null
+
+          Copy-Item "dist\InventarioSerialesCisco.exe" "paquete\InventarioSerialesCisco.exe"
+          Copy-Item "ips.txt" "paquete\ips.txt"
+
+          if (Test-Path "README.md") {
+            Copy-Item "README.md" "paquete\README.md"
+          }
+
+      - name: Generar hash SHA256
+        shell: powershell
+        run: |
+          $hash = Get-FileHash "paquete\InventarioSerialesCisco.exe" -Algorithm SHA256
+          $linea = $hash.Hash + "  InventarioSerialesCisco.exe"
+
+          $linea | Out-File -FilePath "paquete\SHA256.txt" -Encoding ascii
+
+          Write-Host "Hash generado:"
+          Get-Content "paquete\SHA256.txt"
+
+      - name: Mostrar contenido del paquete
+        shell: powershell
+        run: |
+          Get-ChildItem "paquete" |
+            Format-Table Name, Length, LastWriteTime
+
+      - name: Publicar paquete
+        uses: actions/upload-artifact@v7
+        with:
+          name: InventarioSerialesCisco-Windows-x64
+          path: paquete/
+          if-no-files-found: error
+          retention-days: 30
