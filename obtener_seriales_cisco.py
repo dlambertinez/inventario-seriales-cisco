@@ -192,26 +192,26 @@ def extraer_serial_show_inventory(salida):
     if not inventario:
         seriales = re.findall(
             r"\bSN:\s*([A-Za-z0-9._/-]+)",
-            s*lida,
-            flags=re.IGNOREC*SE,
+            salida,
+            flags=re.IGNORECASE,
         )
 
-        for serial_*ncontrado in seriales:
-           *if valor_serial_valido(serial_enco*trado):
-                return ser*al_encontrado.strip()
+        for serial_encontrado in seriales:
+            if valor_serial_valido(serial_encontrado):
+                return serial_encontrado.strip()
 
-        ret*rn None
+        return None
 
-    palabras_principales * (
+    palabras_principales = (
         "chassis",
-        "rou*er",
+        "router",
         "switch",
-        "sy*tem",
+        "system",
     )
 
-    for elemento in i*ventario:
+    for elemento in inventario:
         texto = (
-      *     elemento["name"]
+            elemento["name"]
             + " "
             + elemento["description"]
         ).lower()
@@ -237,202 +237,217 @@ def extraer_serial_show_version(salida):
         r"Serial Number\s*:\s*([A-Za-z0-9._/-]+)",
     ]
 
-   *for patron in patrones:
-        co*ncidencia = re.search(
-           *patron,
+    for patron in patrones:
+        coincidencia = re.search(
+            patron,
             salida,
-      *     flags=re.IGNORECASE,
-        *
+            flags=re.IGNORECASE,
+        )
 
         if coincidencia:
-       *    serial = coincidencia.group(1)*strip()
+            serial = coincidencia.group(1).strip()
 
-            if valor_seri*l_valido(serial):
-                *eturn serial
+            if valor_serial_valido(serial):
+                return serial
 
     return None
 
 
-de* obtener_serial(
-    direccion_ip,*    usuario,
+def obtener_serial(
+    direccion_ip,
+    usuario,
     contrasena,
-    s*creto_enable="",
+    secreto_enable="",
 ):
     """
-    Se*conecta por SSH al equipo Cisco y *btiene su serial.
+    Se conecta por SSH al equipo Cisco y obtiene su serial.
     """
-    disp*sitivo = {
-        "device_type": *cisco_ios",
-        "host": direcc*on_ip,
-        "username": usuario*
+    dispositivo = {
+        "device_type": "cisco_ios",
+        "host": direccion_ip,
+        "username": usuario,
         "password": contrasena,
- *      "secret": secreto_enable,
-  *     "port": 22,
-        "conn_tim*out": 15,
-        "auth_timeout": *5,
+        "secret": secreto_enable,
+        "port": 22,
+        "conn_timeout": 15,
+        "auth_timeout": 15,
         "banner_timeout": 20,
- *      "timeout": 30,
-        "fast*cli": False,
+        "timeout": 30,
+        "fast_cli": False,
     }
 
-    conexion =*None
+    conexion = None
 
     try:
         print("[CONECTANDO] " + direccion_ip)
 
-       *conexion = ConnectHandler(**dispos***vo)
+        conexion = ConnectHandler(**dispositivo)
 
         if secreto_enable:
-***         conexion.enable()
+            conexion.enable()
 
-    *** try:
-            conexion.send_***mand(
-                "terminal ***gth 0",
-                read_tim***t=15,
+        try:
+            conexion.send_command(
+                "terminal length 0",
+                read_timeout=15,
             )
-        exce***Exception:
+        except Exception:
             pass
 
-   ***  salida_inventario = conexion.s***_command(
-            "show inve***ry",
-            read_timeout=45***       )
-
-        serial = extra***serial_show_inventory(
-         ***salida_inventario
+        salida_inventario = conexion.send_command(
+            "show inventory",
+            read_timeout=45,
         )
 
-   ***  if serial:
-            print(
-***             "[CORRECTO] {} - Se***l: {}".format(
-                 ***direccion_ip,
-                  ***erial,
-                )
-       ***  )
-
-            return {
-      ***       "ip": direccion_ip,
-     ***        "serial": serial,
-      ***       "estado": "Correcto - sho***nventory",
-            }
-
-      ***rint(
-            "[INFO] {}: co***ltando show version".format(
-   ***          direccion_ip
-         ***)
+        serial = extraer_serial_show_inventory(
+            salida_inventario
         )
-
-        salida_vers*** = conexion.send_command(
-      ***   "show version",
-            r***_timeout=45,
-        )
-
-        ***ial = extraer_serial_show_versio***            salida_version
-     ***)
 
         if serial:
-          ***rint(
+            print(
                 "[CORRECTO] {} - Serial: {}".format(
-        ***         direccion_ip,
-         ***        serial,
-                ***           )
-
-            return***                "ip": direccion_***
-                "serial": seria***                "estado": "Corre*** - show version",
-            }
-***      return {
-            "ip":***reccion_ip,
-            "serial"***",
-            "estado": (
-     ***        "Conexion correcta, pero*** se encontro el serial"
-        *** ),
-        }
-
-    except Netmik***thenticationException:
-        p***t(
-            "[ERROR] {}: aute***cacion SSH incorrecta".format(
- ***            direccion_ip
-       ***  )
-        )
-
-        return {
-***         "ip": direccion_ip,
-   ***      "serial": "",
-            ***tado": "Error de autenticacion S***,
-        }
-
-    except NetmikoT***outException:
-        print(
-   ***      "[ERROR] {}: tiempo de con***on SSH agotado".format(
-        ***     direccion_ip
+                    direccion_ip,
+                    serial,
+                )
             )
-***     )
 
-        return {
-       ***  "ip": direccion_ip,
-          ***serial": "",
-            "estado***"Tiempo de conexion SSH agotado"***       }
+            return {
+                "ip": direccion_ip,
+                "serial": serial,
+                "estado": "Correcto - show inventory",
+            }
 
-    except Exception a***rror:
-        mensaje = str(erro***replace("\n", " ").strip()
-
-    *** print(
-            "[ERROR] {}:***".format(
-                direcc***_ip,
-                mensaje,
-  ***       )
+        print(
+            "[INFO] {}: consultando show version".format(
+                direccion_ip
+            )
         )
 
-        retu***{
-            "ip": direccion_ip***           "serial": "",
-       ***  "estado": "Error: " + mensaje,***      }
+        salida_version = conexion.send_command(
+            "show version",
+            read_timeout=45,
+        )
+
+        serial = extraer_serial_show_version(
+            salida_version
+        )
+
+        if serial:
+            print(
+                "[CORRECTO] {} - Serial: {}".format(
+                    direccion_ip,
+                    serial,
+                )
+            )
+
+            return {
+                "ip": direccion_ip,
+                "serial": serial,
+                "estado": "Correcto - show version",
+            }
+
+        return {
+            "ip": direccion_ip,
+            "serial": "",
+            "estado": (
+                "Conexion correcta, pero no se encontro el serial"
+            ),
+        }
+
+    except NetmikoAuthenticationException:
+        print(
+            "[ERROR] {}: autenticacion SSH incorrecta".format(
+                direccion_ip
+            )
+        )
+
+        return {
+            "ip": direccion_ip,
+            "serial": "",
+            "estado": "Error de autenticacion SSH",
+        }
+
+    except NetmikoTimeoutException:
+        print(
+            "[ERROR] {}: tiempo de conexion SSH agotado".format(
+                direccion_ip
+            )
+        )
+
+        return {
+            "ip": direccion_ip,
+            "serial": "",
+            "estado": "Tiempo de conexion SSH agotado",
+        }
+
+    except Exception as error:
+        mensaje = str(error).replace("\n", " ").strip()
+
+        print(
+            "[ERROR] {}: {}".format(
+                direccion_ip,
+                mensaje,
+            )
+        )
+
+        return {
+            "ip": direccion_ip,
+            "serial": "",
+            "estado": "Error: " + mensaje,
+        }
 
     finally:
-        if***nexion is not None:
-            ***:
-                conexion.disco***ct()
-            except Exceptio***                pass
+        if conexion is not None:
+            try:
+                conexion.disconnect()
+            except Exception:
+                pass
 
 
-def crear***chivo_excel(resultados, ruta_sal***):
+def crear_archivo_excel(resultados, ruta_salida):
     """
-    Crea el Excel con***s columnas IP, Serial y Estado.
-*** """
+    Crea el Excel con las columnas IP, Serial y Estado.
+    """
     libro = Workbook()
-    ***a = libro.active
-    hoja.title ***Seriales Cisco"
+    hoja = libro.active
+    hoja.title = "Seriales Cisco"
 
-    hoja.append***       [
+    hoja.append(
+        [
             "IP",
             "Serial",
             "Estado",
         ]
     )
 
-    color_enca***ado = PatternFill(
-        fill_***e="solid",
-        fgColor="1F4E***,
+    color_encabezado = PatternFill(
+        fill_type="solid",
+        fgColor="1F4E78",
     )
 
-    fuente_encabezado =***nt(
+    fuente_encabezado = Font(
         color="FFFFFF",
-    *** bold=True,
+        bold=True,
     )
 
-    filas_enc***zado = hoja.iter_rows(
-        m***row=1,
+    filas_encabezado = hoja.iter_rows(
+        min_row=1,
         max_row=1,
-      ***in_col=1,
+        min_col=1,
         max_col=3,
-   ***
-    for fila in filas_encabezad***        for celda in fila:
-     ***    celda.fill = color_encabezad***           celda.font = fuente_e***bezado
-            celda.alignme***= Alignment(
-                hor***ntal="center",
-                v***ical="center",
+    )
+
+    for fila in filas_encabezado:
+        for celda in fila:
+            celda.fill = color_encabezado
+            celda.font = fuente_encabezado
+            celda.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
             )
 
-  ***or resultado in resultados:
-    *** hoja.append(
+    for resultado in resultados:
+        hoja.append(
             [
                 resultado["ip"],
                 resultado["serial"],
@@ -440,217 +455,237 @@ def crear***chivo_excel(resultados, ruta_sal***):
             ]
         )
 
-    hoja.fre***_panes = "A2"
-    hoja.auto_filt***ref = hoja.dimensions
+    hoja.freeze_panes = "A2"
+    hoja.auto_filter.ref = hoja.dimensions
 
-    hoja.***umn_dimensions["A"].width = 18
- ***hoja.column_dimensions["B"].widt*** 25
+    hoja.column_dimensions["A"].width = 18
+    hoja.column_dimensions["B"].width = 25
     hoja.column_dimensions["C"].width = 65
 
-    for fila in hoj***ter_rows(min_row=2):
-        for***lda in fila:
-            celda.a***nment = Alignment(
-             ***vertical="top",
-                ***p_text=True,
+    for fila in hoja.iter_rows(min_row=2):
+        for celda in fila:
+            celda.alignment = Alignment(
+                vertical="top",
+                wrap_text=True,
             )
 
-    ***ro.save(ruta_salida)
+    libro.save(ruta_salida)
 
 
-def obten***argumentos():
+def obtener_argumentos():
     """
-    Obtien***os argumentos de línea de comand***
+    Obtiene los argumentos de línea de comandos.
     """
-    parser = argparse.A***mentParser(
-        description=***           "Obtiene seriales de ***ipos Cisco por SSH "
-           *** genera un archivo Excel."
-     ***)
+    parser = argparse.ArgumentParser(
+        description=(
+            "Obtiene seriales de equipos Cisco por SSH "
+            "y genera un archivo Excel."
+        )
     )
-
-    parser.add_argument***       "-i",
-        "--ips",
-  ***   default=NOMBRE_ARCHIVO_IPS,
- ***)
 
     parser.add_argument(
-    *** "-o",
+        "-i",
+        "--ips",
+        default=NOMBRE_ARCHIVO_IPS,
+    )
+
+    parser.add_argument(
+        "-o",
         "--output",
-     ***default=NOMBRE_ARCHIVO_EXCEL,
-  ***
+        default=NOMBRE_ARCHIVO_EXCEL,
+    )
 
-    return parser.parse_args()***def main():
-    argumentos = obt***r_argumentos()
+    return parser.parse_args()
 
-    ruta_ips = r***lver_ruta(argumentos.ips)
-    ru***excel = resolver_ruta(argumentos***tput)
+
+def main():
+    argumentos = obtener_argumentos()
+
+    ruta_ips = resolver_ruta(argumentos.ips)
+    ruta_excel = resolver_ruta(argumentos.output)
 
     print("=" * 70)
-    p***t(" INVENTARIO DE SERIALES CISCO***R SSH")
+    print(" INVENTARIO DE SERIALES CISCO POR SSH")
     print("=" * 70)
-    ***nt(
-        "Carpeta del program*** "
-        + str(DIRECTORIO_PROG***A)
+    print(
+        "Carpeta del programa : "
+        + str(DIRECTORIO_PROGRAMA)
     )
     print(
-        "Arc***o de IP        : "
-        + str***ta_ips)
+        "Archivo de IP        : "
+        + str(ruta_ips)
     )
     print(
-       ***rchivo de resultados: "
-        ***tr(ruta_excel)
+        "Archivo de resultados: "
+        + str(ruta_excel)
     )
-    print("**** 70)
+    print("=" * 70)
 
     try:
-        direccio***_ip = leer_direcciones_ip(
-     ***    ruta_ips
+        direcciones_ip = leer_direcciones_ip(
+            ruta_ips
         )
 
-    exce***(FileNotFoundError, OSError) as ***or:
-        print("\n[ERROR] " +***r(error))
+    except (FileNotFoundError, OSError) as error:
+        print("\n[ERROR] " + str(error))
         print(
-       ***  "Coloca ips.txt en la misma ca***ta "
-            "del ejecutable***        )
+            "Coloca ips.txt en la misma carpeta "
+            "del ejecutable."
+        )
         return 1
 
-    ***not direcciones_ip:
-        prin***            "\n[ERROR] El archiv***ps.txt "
-            "no contien***P validas."
+    if not direcciones_ip:
+        print(
+            "\n[ERROR] El archivo ips.txt "
+            "no contiene IP validas."
         )
-        re***n 1
+        return 1
 
     print(
-        "\nSe en***traron {} direcciones IP validas***".format(
-            len(direcc***es_ip)
+        "\nSe encontraron {} direcciones IP validas.\n".format(
+            len(direcciones_ip)
         )
     )
 
-    usua*** = input("Usuario SSH: ").strip(***    if not usuario:
-        prin***            "[ERROR] El usuario ***puede estar vacio."
-        )
-  ***   return 1
+    usuario = input("Usuario SSH: ").strip()
 
-    contrasena = ge***ss.getpass(
-        "Contrasena ***: "
-    )
-
-    if not contrasena***       print(
-            "[ERROR] La contrasena no puede estar vac***"
+    if not usuario:
+        print(
+            "[ERROR] El usuario no puede estar vacio."
         )
         return 1
 
-  ***ecreto_enable = getpass.getpass(***      "Contrasena enable opciona***"
-        "presiona Enter para o***ir: "
+    contrasena = getpass.getpass(
+        "Contrasena SSH: "
     )
 
-    resultados = []***  total = len(direcciones_ip)
+    if not contrasena:
+        print(
+            "[ERROR] La contrasena no puede estar vacia."
+        )
+        return 1
 
- ***for posicion, direccion_ip in en***rate(
+    secreto_enable = getpass.getpass(
+        "Contrasena enable opcional; "
+        "presiona Enter para omitir: "
+    )
+
+    resultados = []
+    total = len(direcciones_ip)
+
+    for posicion, direccion_ip in enumerate(
         direcciones_ip,
-  ***   start=1,
+        start=1,
     ):
-        print***           "\n--- Equipo {} de {***{} ---".format(
-                ***icion,
-                total,
-  ***           direccion_ip,
-       ***  )
-        )
-
-        resultado***obtener_serial(
-            dire***on_ip,
-            usuario,
-    ***     contrasena,
-            sec***o_enable,
-        )
-
-        res***ados.append(resultado)
-
-    try:***      crear_archivo_excel(
-     ***    resultados,
-            ruta***cel,
-        )
-
-    except Permi***onError:
         print(
-        *** "\n[ERROR] Cierra seriales_cisc***lsx "
-            "antes de volv***a ejecutar."
+            "\n--- Equipo {} de {}: {} ---".format(
+                posicion,
+                total,
+                direccion_ip,
+            )
         )
-        r***rn 1
 
-    except OSError as erro***        print(
+        resultado = obtener_serial(
+            direccion_ip,
+            usuario,
+            contrasena,
+            secreto_enable,
+        )
+
+        resultados.append(resultado)
+
+    try:
+        crear_archivo_excel(
+            resultados,
+            ruta_excel,
+        )
+
+    except PermissionError:
+        print(
+            "\n[ERROR] Cierra seriales_cisco.xlsx "
+            "antes de volver a ejecutar."
+        )
+        return 1
+
+    except OSError as error:
+        print(
             "\n[ERROR] No se pudo crear el Excel: "
-***         + str(error)
+            + str(error)
         )
-***     return 1
+        return 1
 
-    correctos = s***
+    correctos = sum(
         1
-        for resultado*** resultados
-        if resultado***erial"]
+        for resultado in resultados
+        if resultado["serial"]
     )
 
-    print("\n" + *** * 70)
-    print(" PROCESO FINAL***DO")
+    print("\n" + "=" * 70)
+    print(" PROCESO FINALIZADO")
     print("=" * 70)
-    pri***
-        "Equipos procesados : {***format(
-            len(resultad***
+    print(
+        "Equipos procesados : {}".format(
+            len(resultados)
         )
     )
     print(
-    *** "Seriales obtenidos : {}".forma***            correctos
+        "Seriales obtenidos : {}".format(
+            correctos
         )
-*** )
-    print(
-        "Sin seria*** error : {}".format(
-           ***n(resultados) - correctos
-      ***
     )
     print(
-        "Archi***generado   : "
-        + str(rut***xcel.resolve())
+        "Sin serial o error : {}".format(
+            len(resultados) - correctos
+        )
+    )
+    print(
+        "Archivo generado   : "
+        + str(ruta_excel.resolve())
     )
 
-    retur***
+    return 0
 
 
 def ejecutar_programa():
-    ***
-    Ejecuta el programa y regis*** errores inesperados.
     """
-  ***ry:
+    Ejecuta el programa y registra errores inesperados.
+    """
+    try:
         return main()
 
-    e***pt KeyboardInterrupt:
-        pr***(
-            "\nProceso cancela***por el usuario."
+    except KeyboardInterrupt:
+        print(
+            "\nProceso cancelado por el usuario."
         )
-     ***return 130
+        return 130
 
-    except Exception***       detalle_error = traceback***rmat_exc()
+    except Exception:
+        detalle_error = traceback.format_exc()
 
-        ruta_error =***            DIRECTORIO_PROGRAMA
-***         / NOMBRE_ARCHIVO_ERROR
-***     )
+        ruta_error = (
+            DIRECTORIO_PROGRAMA
+            / NOMBRE_ARCHIVO_ERROR
+        )
 
         try:
-           ***ta_error.write_text(
-           ***  detalle_error,
-               ***coding="utf-8",
+            ruta_error.write_text(
+                detalle_error,
+                encoding="utf-8",
             )
-  ***   except OSError:
-            p***
+        except OSError:
+            pass
 
-        print("\nERROR INESPER***\n")
-        print(detalle_error***       print(
-            "Detal***guardado en: "
-            + str***ta_error)
+        print("\nERROR INESPERADO\n")
+        print(detalle_error)
+        print(
+            "Detalle guardado en: "
+            + str(ruta_error)
         )
 
-        ret*** 1
+        return 1
 
 
 if __name__ == "__main__":
-*** codigo_salida = ejecutar_progra***)
+    codigo_salida = ejecutar_programa()
     pausar_programa()
-    sys.***t(codigo_salida)
+    sys.exit(codigo_salida)
