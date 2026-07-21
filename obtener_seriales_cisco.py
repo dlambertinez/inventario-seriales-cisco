@@ -28,7 +28,7 @@ def obtener_directorio_programa() -> Path:
     """
     Obtiene la carpeta en la que se encuentra el programa.
 
-    Si se ejecuta como archivo EXE, retorna la carpeta del ejecutable.
+    Si se ejecuta como EXE, retorna la carpeta del ejecutable.
     Si se ejecuta como archivo Python, retorna la carpeta del archivo .py.
     """
     if getattr(sys, "frozen", False):
@@ -75,7 +75,7 @@ def leer_direcciones_ip(ruta_archivo: Path) -> list"""
     """
     if not ruta_archivo.exists():
         raise FileNotFoundError(
-            f"No se encontró el archivo de direcciones IP: "
+            "No se encontró el archivo de direcciones IP: "
             f"{ruta_archivo.resolve()}"
         )
 
@@ -207,7 +207,6 @@ def extraer_serial_show_version(salida: str) -> Optional"""
     patrones = [
         r"Processor board ID\s+([A-Za-z0-9._/-]+)",
         r"System serial number\s*:\s*([A-Za-z0-9._/-]+)",
-        r"System Serial Number\s*:\s*([A-Za-z0-9._/-]+)",
         r"Chassis Serial Number\s*:\s*([A-Za-z0-9._/-]+)",
         r"Motherboard serial number\s*:\s*([A-Za-z0-9._/-]+)",
         r"Serial Number\s*:\s*([A-Za-z0-9._/-]+)",
@@ -262,7 +261,10 @@ def obtener_serial(
         if secreto_enable:
             try:
                 conexion.enable()
-                print(f"[ENABLE] {direccion_ip}: modo privilegiado activo")
+                print(
+                    f"[ENABLE] {direccion_ip}: "
+                    "modo privilegiado activo"
+                )
             except Exception as error:
                 mensaje = str(error).replace("\n", " ").strip()
 
@@ -287,6 +289,7 @@ def obtener_serial(
                 read_timeout=15,
             )
         except Exception:
+            # Algunos dispositivos no requieren este comando.
             pass
 
         salida_inventario = conexion.send_command(
@@ -338,7 +341,8 @@ def obtener_serial(
 
     except NetmikoAuthenticationException:
         print(
-            f"[ERROR] {direccion_ip}: autenticación SSH incorrecta"
+            f"[ERROR] {direccion_ip}: "
+            "autenticación SSH incorrecta"
         )
 
         return {
@@ -349,7 +353,8 @@ def obtener_serial(
 
     except NetmikoTimeoutException:
         print(
-            f"[ERROR] {direccion_ip}: tiempo de conexión SSH agotado"
+            f"[ERROR] {direccion_ip}: "
+            "tiempo de conexión SSH agotado"
         )
 
         return {
@@ -360,7 +365,8 @@ def obtener_serial(
 
     except TimeoutError:
         print(
-            f"[ERROR] {direccion_ip}: tiempo de conexión agotado"
+            f"[ERROR] {direccion_ip}: "
+            "tiempo de conexión agotado"
         )
 
         return {
@@ -412,12 +418,21 @@ def crear_archivo_excel(
         bold=True,
     )
 
-    for celda in hojacelda.fill = color_encabezado
-        celda.font = fuente_encabezado
-        celda.alignment = Alignment(
-            horizontal="center",
-            vertical="center",
-        )
+    filas_encabezado = hoja.iter_rows(
+        min_row=1,
+        max_row=1,
+        min_col=1,
+        max_col=3,
+    )
+
+    for fila in filas_encabezado:
+        for celda in fila:
+            celda.fill = color_encabezado
+            celda.font = fuente_encabezado
+            celda.alignment = Alignment(
+                horizontal="center",
+                vertical="center",
+            )
 
     for resultado in resultados:
         hoja.append(
@@ -542,7 +557,7 @@ def main() -> int:
 
     except OSError as error:
         print(
-            f"\n[ERROR] No fue posible leer el archivo "
+            "\n[ERROR] No fue posible leer el archivo "
             f"de direcciones IP: {error}"
         )
         return 1
@@ -577,7 +592,6 @@ def main() -> int:
     )
 
     resultados: list[dict[str, str]] = []
-
     total_equipos = len(direcciones_ip)
 
     for posicion, direccion_ip in enumerate(
@@ -609,7 +623,7 @@ def main() -> int:
 
     except PermissionError:
         print(
-            f"\n[ERROR] No se pudo guardar el archivo:\n"
+            "\n[ERROR] No se pudo guardar el archivo:\n"
             f"{ruta_excel}"
         )
         print(
@@ -656,7 +670,9 @@ def ejecutar_programa() -> int:
 
     except Exception:
         detalle_error = traceback.format_exc()
-        ruta_error = DIRECTORIO_PROGRAMA / NOMBRE_ARCHIVO_ERROR
+        ruta_error = (
+            DIRECTORIO_PROGRAMA / NOMBRE_ARCHIVO_ERROR
+        )
 
         try:
             ruta_error.write_text(
