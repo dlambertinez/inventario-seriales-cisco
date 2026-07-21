@@ -77,22 +77,22 @@ jobs:
           $codigoDanado = "hoja" + "celda"
 
           if ($contenido.Contains($htmlMayor)) {
-            throw "El codigo contiene una entidad HTML para el simbolo mayor que."
+            throw "El codigo contiene una entidad HTML incorrecta."
           }
 
           if ($contenido.Contains($htmlMenor)) {
-            throw "El codigo contiene una entidad HTML para el simbolo menor que."
+            throw "El codigo contiene una entidad HTML incorrecta."
           }
 
           if ($contenido.Contains($htmlAmp)) {
-            throw "El codigo contiene una entidad HTML para el simbolo ampersand."
+            throw "El codigo contiene una entidad HTML incorrecta."
           }
 
           if ($contenido.Contains($codigoDanado)) {
             throw "El codigo contiene el texto incorrecto hojacelda."
           }
 
-          Write-Host "No se encontraron entidades HTML ni codigo danado."
+          Write-Host "Codigo sin entidades HTML incorrectas."
 
       - name: Validar sintaxis de Python
         shell: powershell
@@ -100,15 +100,22 @@ jobs:
           python -m py_compile obtener_seriales_cisco.py
           Write-Host "Sintaxis de Python valida."
 
-      - name: Validar importaciones
+      - name: Validar importaciones y versiones
         shell: powershell
         run: |
+          python -c "import paramiko; print('Paramiko:', paramiko.__version__)"
           python -c "import netmiko; print('Netmiko:', netmiko.__version__)"
           python -c "import openpyxl; print('OpenPyXL:', openpyxl.__version__)"
-          python -c "import paramiko; print('Paramiko:', paramiko.__version__)"
           python -c "import textfsm; print('TextFSM correcto')"
           python -c "import ntc_templates; print('NTC Templates correcto')"
           python -c "import PyInstaller; print('PyInstaller:', PyInstaller.__version__)"
+
+          python -c "import paramiko; assert paramiko.__version__ == '3.5.1', 'Version incorrecta de Paramiko'"
+
+      - name: Mostrar algoritmos KEX incluidos
+        shell: powershell
+        run: |
+          python -c "from paramiko import Transport; print(Transport._preferred_kex)"
 
       - name: Generar ejecutable
         shell: powershell
