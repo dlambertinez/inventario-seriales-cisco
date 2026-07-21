@@ -1,0 +1,104 @@
+name: Generar EXE Windows 64 bits
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "obtener_seriales_cisco.py"
+      - "requirements.txt"
+      - ".github/workflows/generar-exe.yml"
+
+jobs:
+  generar-exe:
+    name: Compilar ejecutable
+    runs-on: windows-latest
+
+    steps:
+      - name: Descargar contenido del repositorio
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+          cache: "pip"
+
+      - name: Mostrar versión de Python
+        shell: powershell
+        run: |
+          python --version
+          python -c "import platform; print('Arquitectura:', platform.architecture())"
+
+      - name: Actualizar pip
+        shell: powershell
+        run: |
+          python -m pip install --upgrade pip
+
+      - name: Instalar dependencias
+        shell: powershell
+        run: |
+          python -m pip install -r requirements.txt
+
+      - name: Validar sintaxis del programa
+        shell: powershell
+        run: |
+          python -m py_compile obtener_seriales_cisco.py
+
+      - name: Generar EXE con PyInstaller
+        shell: powershell
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --console `
+            --name InventarioSerialesCisco `
+            --collect-all netmiko `
+            --collect-all textfsm `
+            --collect-all ntc_templates `
+            --hidden-import openpyxl `
+            --hidden-import openpyxl.cell._writer `
+            obtener_seriales_cisco.py
+
+      - name: Verificar archivo generado
+        shell: powershell
+        run: |
+          if (-not (Test-Path "dist\InventarioSerialesCisco.exe")) {
+            throw "No se generó el archivo ejecutable."
+          }
+
+          Get-Item "dist\InventarioSerialesCisco.exe" |
+            Format-List Name, Length, LastWriteTime
+
+      - name: Preparar paquete de distribución
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path "paquete" | Out-Null
+          Copy-Item "dist\InventarioSerialesCisco.exe" "paquete\"
+          Copy-Item "ips.txt" "paquete\"
+          Copy-Item "README.md" "paquete\"
+
+      - name: Generar hash SHA256
+        shell: powershell
+        run: |
+          $hash = Get-FileHash `
+            "paquete\InventarioSerialesCisco.exe" `
+            -Algorithm SHA256
+
+          "$($hash.Hash)  InventarioSerialesCisco.exe" |
+            Out-File `
+              -FilePath "paquete\SHA256.txt" `
+              -Encoding ascii
+
+          Get-Content "paquete\SHA256.txt"
+
+      - name: Publicar ejecutable como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: InventarioSerialesCisco-Windows-x64
+          path: paquete/
+          if-no-files-found: error
+          retention-days: 30
